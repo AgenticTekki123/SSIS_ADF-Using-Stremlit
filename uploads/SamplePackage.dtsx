@@ -1,0 +1,219 @@
+<?xml version="1.0"?>
+<DTS:Executable xmlns:DTS="www.microsoft.com/SqlServer/Dts"
+  DTS:refId="Package"
+  DTS:CreationDate="2024-01-15"
+  DTS:CreationName="Microsoft.Package"
+  DTS:CreatorComputerName="ONPREM-SQL"
+  DTS:CreatorName="DOMAIN\User"
+  DTS:DTSID="{12345678-1234-1234-1234-123456789012}"
+  DTS:ExecutableType="Microsoft.Package"
+  DTS:LastModifiedProductVersion="15.0.2000.5"
+  DTS:LocaleID="1033"
+  DTS:ObjectName="CustomerDataLoad"
+  DTS:PackageType="5"
+  DTS:VersionBuild="1"
+  DTS:VersionGUID="{87654321-4321-4321-4321-210987654321}">
+
+  <DTS:Variables>
+    <DTS:Variable
+      DTS:CreationName=""
+      DTS:DTSID="{11111111-1111-1111-1111-111111111111}"
+      DTS:IncludeInDebugDump="2358"
+      DTS:Namespace="User"
+      DTS:ObjectName="FilePath"
+      DTS:ValueType="String">
+      <DTS:VariableValue DTS:DataType="8">C:\Data\Input\</DTS:VariableValue>
+    </DTS:Variable>
+    <DTS:Variable
+      DTS:CreationName=""
+      DTS:DTSID="{22222222-2222-2222-2222-222222222222}"
+      DTS:IncludeInDebugDump="2358"
+      DTS:Namespace="User"
+      DTS:ObjectName="BatchID"
+      DTS:ValueType="Int32">
+      <DTS:VariableValue DTS:DataType="3">1001</DTS:VariableValue>
+    </DTS:Variable>
+  </DTS:Variables>
+
+  <DTS:ConnectionManagers>
+    <DTS:ConnectionManager
+      DTS:refId="Package.ConnectionManagers[OnPremSQLSource]"
+      DTS:CreationName="OLEDB"
+      DTS:DTSID="{33333333-3333-3333-3333-333333333333}"
+      DTS:ObjectName="OnPremSQLSource"
+      DTS:Description="Connection to On-Premises SQL Server">
+      <DTS:ObjectData>
+        <DTS:ConnectionManager
+          DTS:ConnectionString="Data Source=192.168.1.50;Initial Catalog=SourceDB;Provider=SQLOLEDB.1;Integrated Security=SSPI;" />
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+
+    <DTS:ConnectionManager
+      DTS:refId="Package.ConnectionManagers[AzureSQLDestination]"
+      DTS:CreationName="OLEDB"
+      DTS:DTSID="{44444444-4444-4444-4444-444444444444}"
+      DTS:ObjectName="AzureSQLDestination"
+      DTS:Description="Connection to Azure SQL Database">
+      <DTS:ObjectData>
+        <DTS:ConnectionManager
+          DTS:ConnectionString="Data Source=tcp:your-sql-server.database.windows.net;Initial Catalog=TargetDB;User ID=sqluser;Password=***;Provider=SQLOLEDB.1;" />
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+
+    <DTS:ConnectionManager
+      DTS:refId="Package.ConnectionManagers[FlatFileSource]"
+      DTS:CreationName="FLATFILE"
+      DTS:DTSID="{55555555-5555-5555-5555-555555555555}"
+      DTS:ObjectName="FlatFileSource"
+      DTS:Description="CSV File Connection">
+      <DTS:ObjectData>
+        <DTS:ConnectionManager
+          DTS:ConnectionString="C:\Data\Input\customers.csv" />
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+  </DTS:ConnectionManagers>
+
+  <DTS:Executables>
+    <!-- Execute SQL Task -->
+    <DTS:Executable
+      DTS:refId="Package\Truncate Target Table"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:DTSID="{66666666-6666-6666-6666-666666666666}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="Truncate Target Table"
+      DTS:TaskContact="Execute SQL Task">
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask"
+          SQLTask:Connection="{33333333-3333-3333-3333-333333333333}"
+          SQLTask:SqlStatementSource="TRUNCATE TABLE dbo.Customers" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+
+    <!-- Data Flow Task -->
+    <DTS:Executable
+      DTS:refId="Package\Load Customer Data"
+      DTS:CreationName="Microsoft.Pipeline"
+      DTS:DTSID="{77777777-7777-7777-7777-777777777777}"
+      DTS:ExecutableType="Microsoft.Pipeline"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="Load Customer Data"
+      DTS:TaskContact="Data Flow Task">
+      <DTS:ObjectData>
+        <pipeline version="1">
+          <components>
+            <component
+              refId="Package\Load Customer Data\OLE DB Source"
+              componentClassID="Microsoft.OLEDBSource"
+              name="OLE DB Source"
+              version="7">
+              <properties>
+                <property name="SqlCommand" dataType="System.String">SELECT CustomerID, Name, Email FROM dbo.SourceCustomers</property>
+              </properties>
+            </component>
+            <component
+              refId="Package\Load Customer Data\Lookup"
+              componentClassID="Microsoft.Lookup"
+              name="Lookup"
+              version="7">
+              <properties>
+                <property name="CacheType" dataType="System.String">Full</property>
+              </properties>
+            </component>
+            <component
+              refId="Package\Load Customer Data\Derived Column"
+              componentClassID="Microsoft.DerivedColumn"
+              name="Derived Column"
+              version="7">
+              <properties>
+                <property name="DerivedColumnExpressions" dataType="System.String">UPPER(Name)</property>
+              </properties>
+            </component>
+            <component
+              refId="Package\Load Customer Data\OLE DB Destination"
+              componentClassID="Microsoft.OLEDBDestination"
+              name="OLE DB Destination"
+              version="7">
+              <properties>
+                <property name="TableOrViewName" dataType="System.String">[dbo].[Customers]</property>
+              </properties>
+            </component>
+          </components>
+        </pipeline>
+      </DTS:ObjectData>
+    </DTS:Executable>
+
+    <!-- For Each Loop Container -->
+    <DTS:Executable
+      DTS:refId="Package\Process Files"
+      DTS:CreationName="Microsoft.ForEachLoopContainer"
+      DTS:DTSID="{88888888-8888-8888-8888-888888888888}"
+      DTS:ExecutableType="Microsoft.ForEachLoopContainer"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="Process Files"
+      DTS:TaskContact="For Each Loop Container">
+      <DTS:Executables>
+        <DTS:Executable
+          DTS:refId="Package\Process Files\Process Single File"
+          DTS:CreationName="Microsoft.Pipeline"
+          DTS:DTSID="{99999999-9999-9999-9999-999999999999}"
+          DTS:ExecutableType="Microsoft.Pipeline"
+          DTS:ObjectName="Process Single File" />
+      </DTS:Executables>
+    </DTS:Executable>
+
+    <!-- Script Task -->
+    <DTS:Executable
+      DTS:refId="Package\Send Notification"
+      DTS:CreationName="Microsoft.ScriptTask"
+      DTS:DTSID="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+      DTS:ExecutableType="Microsoft.ScriptTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="Send Notification"
+      DTS:TaskContact="Script Task">
+      <DTS:ObjectData>
+        <ScriptProject
+          Name="ST_1234567890"
+          Language="CSharp"
+          EntryPoint="ScriptMain.cs" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+
+    <!-- Execute Package Task -->
+    <DTS:Executable
+      DTS:refId="Package\Call Child Package"
+      DTS:CreationName="Microsoft.ExecutePackageTask"
+      DTS:DTSID="{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}"
+      DTS:ExecutableType="Microsoft.ExecutePackageTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="Call Child Package"
+      DTS:TaskContact="Execute Package Task">
+      <DTS:ObjectData>
+        <ExecutePackageTask
+          PackageName="ChildPackage.dtsx"
+          PackagePath="C:\SSIS\ChildPackage.dtsx" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+  </DTS:Executables>
+
+  <DTS:PrecedenceConstraints>
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[Constraint 1]"
+      DTS:CreationName=""
+      DTS:DTSID="{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}"
+      DTS:From="Package\Truncate Target Table"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="Constraint 1"
+      DTS:To="Package\Load Customer Data" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[Constraint 2]"
+      DTS:CreationName=""
+      DTS:DTSID="{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}"
+      DTS:From="Package\Load Customer Data"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="Constraint 2"
+      DTS:To="Package\Send Notification" />
+  </DTS:PrecedenceConstraints>
+
+</DTS:Executable>
