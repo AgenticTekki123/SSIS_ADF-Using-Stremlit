@@ -21,20 +21,31 @@ client = AzureOpenAI(
 )
 
 def convert_ssis_to_adf(ssis_json):
+    # Left-aligned prompt for clarity and better AI parsing
     prompt = f"""
-    You are an expert Azure Data Factory engineer.
-    Convert the following SSIS package structure into valid ADF JSON artifacts.
-    
-    SSIS Structure:
-    {json.dumps(ssis_json, indent=2)}
-    
-    Requirements:
-    1. Create 'linkedServices' based on the connections provided. Use 'AzureSqlDatabase' for OLEDB/SQL and 'AzureBlobStorage' for FlatFile.
-    2. Create 'datasets' referencing those linked services. Name them dynamically.
-    3. Create a 'pipeline' with activities mapping the SSIS tasks.
-    4. Return ONLY valid JSON with keys: "linkedServices", "datasets", "pipeline".
-    5. Ensure 'properties' and 'typeProperties' wrappers are included.
-    """
+You are an expert Azure Data Factory engineer.
+Convert the following SSIS package structure into valid ADF JSON artifacts.
+
+SSIS Structure:
+{json.dumps(ssis_json, indent=2)}
+
+CRITICAL REQUIREMENTS:
+1. Return ONLY valid JSON with keys: "linkedServices", "datasets", "pipeline".
+2. For LINKED SERVICES: Use 'AzureSqlDatabase' for OLEDB and 'AzureBlobStorage' for FlatFile.
+3. For DATASETS:
+   - If SQL: Use type 'AzureSqlTable'.
+   - If FlatFile/Blob: You MUST use type 'DelimitedText' AND include this exact structure for location:
+     "typeProperties": {{
+       "location": {{
+         "type": "AzureBlobStorageLocation",
+         "container": "ssis-packages"
+       }},
+       "columnDelimiter": ",",
+       "firstRowAsHeader": true
+     }}
+4. For PIPELINE: Map tasks correctly. Ensure 'inputs' and 'outputs' reference the EXACT dataset names you created.
+5. Do not use generic types. Be specific.
+"""
 
     response = client.chat.completions.create(
         model=deployment,
